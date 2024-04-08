@@ -1,0 +1,14 @@
+[project]
+name = "reconfillion"
+version = "1.0.0"
+authors = [
+    { name = "Jun Kawahara", email = "junkawahara@users.noreply.github.com"},
+    { name = "Hiroki Yamazaki"}
+]
+description = "Solving combinatorial reconfiguration problems."
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+keywords = ["graph algorithm", "combinatorial reconfiguration", "graphillion"]
+
+[tool.setuptools]
+py-modules = []
