@@ -1,12 +1,12 @@
 # Reconfillion - Python interface for combinatorial reconfiguration problems
 
-Reconfillion was released as version 1.0.0 on April 8, 2024. The older version of reconfillion prior to that date exist on https://github.com/junkawahara/reconfillion-kari , but are not compatible with this version.
+Reconfillion was released as version 1.0.0 on April 8, 2024. The older version of reconfillion before that date exists on https://github.com/junkawahara/reconfillion-kari , but is not compatible with this version.
 
 Reconfillion is a tool for solving combinatorial reconfiguration problems. It works with [graphillion](https://github.com/takemaru/graphillion), which means that combinatorial reconfiguration problems of graph classes that are supported by graphillion can be solved by reconfillion.
 
 ## Requirements
 
-* Graphillion version [v1.7rc](https://github.com/takemaru/graphillion/tree/v1.7rc) is needed. Since v1.7rc is the latest version and has not been registered into PyPI yet, you need to build it manually.
+* Graphillion version [v1.7](https://github.com/takemaru/graphillion/) is needed. Since v1.7 is the latest version and has not been registered into PyPI yet, you need to build it manually.
 
 ## License
 
@@ -14,13 +14,13 @@ MIT License
 
 ## Install
 
-First, clone and install Graphillion version [v1.7rc](https://github.com/takemaru/graphillion/tree/v1.7rc),
+First, clone and install latest [Graphillion](https://github.com/takemaru/graphillion/),
 
 ```
-git clone -b v1.7rc https://github.com/takemaru/graphillion.git
+git clone https://github.com/takemaru/graphillion.git
 ```
 
-and build it according to the [instruction](https://github.com/takemaru/graphillion/tree/v1.7rc?tab=readme-ov-file#installing-from-source).
+and build it according to the [instruction](https://github.com/takemaru/graphillion/?tab=readme-ov-file#installing-from-source).
 
 Then, clone and install reconfillion:
 
@@ -65,4 +65,4 @@ reconf_sequence = reconf.get_reconf_seq(s, t, spanning_trees, model = 'tj')
 
 ## Note
 
-This software (and graphillion) needs a lot of memory to solve problems with large size instances.
+This software (and graphillion) needs a lot of memory to solve problems with large-size instances.
