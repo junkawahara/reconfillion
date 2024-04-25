@@ -1,33 +1,23 @@
 # Reconfillion - Python interface for combinatorial reconfiguration problems
 
-Reconfillion was released as version 1.0.0 on April 8, 2024. The older version of reconfillion before that date exists on https://github.com/junkawahara/reconfillion-kari , but is not compatible with this version.
+Reconfillion was released as version 1.0.0 on April 22, 2024. The older version of reconfillion before that date exists on https://github.com/junkawahara/reconfillion-kari , but is not compatible with this version.
 
 Reconfillion is a tool for solving combinatorial reconfiguration problems. It works with [graphillion](https://github.com/takemaru/graphillion), which means that combinatorial reconfiguration problems of graph classes that are supported by graphillion can be solved by reconfillion.
 
 ## Requirements
 
-* Graphillion version [v1.7](https://github.com/takemaru/graphillion/) is needed. Since v1.7 is the latest version and has not been registered into PyPI yet, you need to build it manually.
+* [Graphillion version v1.7 or higher](https://github.com/takemaru/graphillion/) is needed.
 
 ## License
 
 MIT License
 
-## Install
+## Quick install
 
-First, clone and install latest [Graphillion](https://github.com/takemaru/graphillion/),
-
-```
-git clone https://github.com/takemaru/graphillion.git
-```
-
-and build it according to the [instruction](https://github.com/takemaru/graphillion/?tab=readme-ov-file#installing-from-source).
-
-Then, clone and install reconfillion:
+You can install reconfillion via pip.
 
 ```
-git clone https://github.com/junkawahara/reconfillion.git
-cd reconfillion
-pip install .
+pip install reconfillion
 ```
 
 ## Tutorial
@@ -66,3 +56,11 @@ reconf_sequence = reconf.get_reconf_seq(s, t, spanning_trees, model = 'tj')
 ## Note
 
 This software (and graphillion) needs a lot of memory to solve problems with large-size instances.
+
+## Authors
+
+Reconfillion has been developed by Jun Kawahara and Hiroki Yamazaki.
+
+## Acknowledgment
+
+This project is/was partially supported by JSPS KAKENHI Grant Numbers JP18H04091, JP20H05794, and JP23H04383.
