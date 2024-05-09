@@ -1,7 +1,7 @@
 from graphillion import setset, GraphSet
 
 def _get_seq(setset_seq, s, t, search_space, model, k):
-    reconf_seq = [t]
+    reconf_seq = [set(t)]
     current_set = t
     for i in range(len(setset_seq) - 2, -1, -1):
         if isinstance(search_space, GraphSet):
@@ -14,13 +14,19 @@ def _get_seq(setset_seq, s, t, search_space, model, k):
             else:
                 next_ss = sz.remove_add_some_elements()
         current_set = (setset_seq[i] & next_ss).choice()
-        reconf_seq.append(current_set)
+        reconf_seq.insert(0, set(current_set))
     return reconf_seq
 
 def get_reconf_seq(s, t, search_space, model = 'tj', k = 1):
     if model != 'tj':
         raise NotImplementedError
-    
+
+    if s not in search_space:
+        raise ValueError('s must be in search_space.')
+
+    if t not in search_space:
+        raise ValueError('t must be in search_space.')
+
     if s == t:
         return [s]
     
@@ -38,6 +44,8 @@ def get_reconf_seq(s, t, search_space, model = 'tj', k = 1):
                 next_ss = setset_seq[-1].remove_add_some_edges()
             else:
                 next_ss = setset_seq[-1].remove_add_some_elements()
+
+        next_ss = next_ss & search_space
 
         setset_seq.append(next_ss)
         if t in next_ss:
