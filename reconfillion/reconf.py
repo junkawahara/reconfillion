@@ -11,14 +11,54 @@ def _singleton(state, search_space):
     else:
         raise TypeError
 
-def _one_move(family, search_space, model):
+def _with_without(family, search_space, u, v):
+    """Subfamily of ``family`` whose states contain ``u`` but not ``v``.
+
+    ``GraphSet``/``VertexSetSet`` expose ``including``/``excluding`` taking a
+    single edge/vertex; plain ``setset`` does not, so containment is expressed
+    with ``supersets``/``non_supersets`` of the singleton family ``{{u}}``.
+    """
+    if isinstance(search_space, (GraphSet, VertexSetSet)):
+        return family.including(u).excluding(v)
+    return family.supersets(setset([[u]])).non_supersets(setset([[v]]))
+
+def _slide_move(family, search_space, graph):
+    """Token Sliding one-move neighborhood along the adjacencies in ``graph``.
+
+    ``graph`` is a list of ``(a, b)`` pairs of adjacent elements (vertices for
+    ``VertexSetSet``, edges for ``GraphSet``, elements for ``setset``). A token
+    may slide from ``a`` to an adjacent ``b`` or vice versa, keeping cardinality
+    fixed: for every state containing ``a`` but not ``b``, ``a`` is removed and
+    ``b`` added (and symmetrically). The union over both directions of every
+    edge is the full one-move neighborhood. The slide relation is symmetric,
+    which ``_get_seq``'s backward pass relies on.
+
+    ``flip`` mutates its family in place (and returns ``None``), but each
+    ``_with_without`` result is a fresh family disjoint from ``family``, so the
+    in-place flips are safe.
+    """
+    result = type(family)([])  # empty family of the matching graphillion type
+    for a, b in graph:
+        for u, v in ((a, b), (b, a)):
+            g = _with_without(family, search_space, u, v)
+            g.flip(u)  # every state in g contains u -> u removed
+            g.flip(v)  # no state in g contains v   -> v added
+            result = result | g
+    return result
+
+def _one_move(family, search_space, model, graph=None):
     """Return the family of states reachable from ``family`` in one move.
 
     - ``tj`` (token jumping): remove one element and add one (size unchanged).
     - ``tar`` (token addition/removal): add one element *or* remove one
       (size changes by +-1). The caller is responsible for restricting the
       result to the valid size range by intersecting with the search space.
+    - ``ts`` (token sliding): move one token to an *adjacent* element along
+      ``graph`` (size unchanged). Handled type-agnostically by ``_slide_move``,
+      so it is dispatched before the per-type branches below.
     """
+    if model == 'ts':
+        return _slide_move(family, search_space, graph)
     # ``model`` is validated by the public entry points, so every branch below
     # is expected to return; the trailing ``raise`` is a defensive backstop.
     if isinstance(search_space, GraphSet):
@@ -50,7 +90,7 @@ def _restrict_size(family, lower, upper):
         family = family.smaller(upper + 1)  # keep size <= upper
     return family
 
-def _forward_bfs(s, search_space, effective_space, model, stop):
+def _forward_bfs(s, search_space, effective_space, model, stop, graph=None):
     """Expand the reachable frontier from ``s`` one move at a time.
 
     Starting from the singleton family ``{s}``, repeatedly apply ``_one_move``
@@ -71,7 +111,7 @@ def _forward_bfs(s, search_space, effective_space, model, stop):
     setset_seq = [_singleton(s, search_space)]
     reached = setset_seq[0]
     while True:
-        next_ss = _one_move(setset_seq[-1], search_space, model) & effective_space
+        next_ss = _one_move(setset_seq[-1], search_space, model, graph) & effective_space
         setset_seq.append(next_ss)
         if stop(next_ss):
             return setset_seq, True
@@ -82,12 +122,12 @@ def _forward_bfs(s, search_space, effective_space, model, stop):
             return setset_seq, False
         reached = reached | next_ss
 
-def _get_seq(setset_seq, s, t, search_space, model, k):
+def _get_seq(setset_seq, s, t, search_space, model, k, graph=None):
     reconf_seq = [set(t)]
     current_set = t
     for i in range(len(setset_seq) - 2, -1, -1):
         sz = _singleton(current_set, search_space)
-        next_ss = _one_move(sz, search_space, model)
+        next_ss = _one_move(sz, search_space, model, graph)
         current_set = (setset_seq[i] & next_ss).choice()
         reconf_seq.insert(0, set(current_set))
     return reconf_seq
@@ -113,7 +153,21 @@ def _effective_space(states, search_space, model, lower, upper):
             f"lower/upper are only supported for the 'tar' model, not '{model}'.")
     return search_space
 
-def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper = None):
+def _check_graph(model, graph):
+    """Validate the ``graph`` argument against ``model``.
+
+    The ``ts`` model needs an adjacency ``graph`` (a list of ``(a, b)`` adjacent
+    element pairs); every other model has no notion of adjacency and rejects it.
+    """
+    if model == 'ts':
+        if graph is None:
+            raise ValueError(
+                "the 'ts' model requires a 'graph' (list of adjacent pairs).")
+    elif graph is not None:
+        raise ValueError(
+            f"'graph' is only supported for the 'ts' model, not '{model}'.")
+
+def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper = None, graph = None):
     """Return a shortest reconfiguration sequence from ``s`` to ``t``.
 
     Given a start state ``s`` and goal state ``t`` (each a subset of the
@@ -131,6 +185,11 @@ def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper 
       (cardinality changes by +-1). ``lower``/``upper`` (either may be ``None``)
       bound every state's size; ``s`` and ``t`` must lie within ``[lower, upper]``
       but may differ in size. ``lower``/``upper`` are rejected for other models.
+    - ``'ts'`` (token sliding): each move slides one token to an *adjacent*
+      element, keeping the cardinality fixed (so ``|s|`` must equal ``|t|``).
+      ``graph`` -- a list of ``(a, b)`` adjacent element pairs (e.g. the
+      underlying graph's edges for vertex states) -- is required and defines
+      adjacency; it is rejected for other models.
 
     The search is a breadth-first frontier expansion over ZDD set families
     (``_forward_bfs``): starting from ``{s}`` it expands one move at a time,
@@ -140,10 +199,13 @@ def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper 
     without reaching ``t``, ``t`` is unreachable and ``[]`` is returned.
 
     Raises ``ValueError`` if ``s`` or ``t`` is not in ``search_space``, or (for
-    tar) falls outside ``[lower, upper]``. ``k`` is an unused placeholder.
+    tar) falls outside ``[lower, upper]``, or if ``graph`` is missing for ts /
+    supplied for another model. ``k`` is an unused placeholder.
     """
-    if model not in ('tj', 'tar'):
+    if model not in ('tj', 'tar', 'ts'):
         raise NotImplementedError
+
+    _check_graph(model, graph)
 
     if s not in search_space:
         raise ValueError('s must be in search_space.')
@@ -162,12 +224,12 @@ def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper 
 
     # Expand the frontier until t appears (reachable) or it saturates without t.
     setset_seq, found = _forward_bfs(
-        s, search_space, effective_space, model, stop=lambda ss: t in ss)
+        s, search_space, effective_space, model, stop=lambda ss: t in ss, graph=graph)
     if found:
-        return _get_seq(setset_seq, s, t, search_space, model, k)
+        return _get_seq(setset_seq, s, t, search_space, model, k, graph)
     return []
 
-def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper = None):
+def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper = None, graph = None):
     """Return a shortest reconfiguration sequence to a farthest state from ``s``.
 
     Given only the start state ``s``, find a state ``t`` reachable from ``s``
@@ -179,13 +241,16 @@ def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper 
     Every state in the returned sequence is a ``set`` (including the trivial
     single-element case), matching ``get_reconf_seq``.
 
-    Supports the same ``tj`` / ``tar`` models as ``get_reconf_seq`` (for tar,
-    ``lower``/``upper`` bound every state's size). Unlike ``get_reconf_seq`` the
-    frontier is always expanded to saturation, since the farthest state is not
-    known in advance.
+    Supports the same ``tj`` / ``tar`` / ``ts`` models as ``get_reconf_seq``
+    (for tar, ``lower``/``upper`` bound every state's size; for ts, ``graph``
+    defines adjacency and is required). Unlike ``get_reconf_seq`` the frontier
+    is always expanded to saturation, since the farthest state is not known in
+    advance.
     """
-    if model not in ('tj', 'tar'):
+    if model not in ('tj', 'tar', 'ts'):
         raise NotImplementedError
+
+    _check_graph(model, graph)
 
     if s not in search_space:
         raise ValueError('s must be in search_space.')
@@ -195,7 +260,7 @@ def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper 
 
     # Expand the whole reachable component (never stop early).
     setset_seq, _ = _forward_bfs(
-        s, search_space, effective_space, model, stop=lambda ss: False)
+        s, search_space, effective_space, model, stop=lambda ss: False, graph=graph)
 
     # The farthest distance is the last level at which a state appears for the
     # first time. _forward_bfs's final frontier is the saturating one (it adds
@@ -213,4 +278,4 @@ def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper 
         return [set(s)]
 
     t = last_new.choice()
-    return _get_seq(setset_seq[:last_level + 1], s, t, search_space, model, k=1)
+    return _get_seq(setset_seq[:last_level + 1], s, t, search_space, model, k=1, graph=graph)

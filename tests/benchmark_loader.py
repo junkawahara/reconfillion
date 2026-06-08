@@ -98,8 +98,10 @@ def instance_paths(col_relpath, dat_relpath):
 def _solve_worker(n, edges, s, t, model, lower, upper):
     """Solve one instance and return the reconfiguration sequence.
 
-    Runs in a fresh subprocess (see ``solve_isolated``). ``model`` is ``"tj"`` or
-    ``"tar"``; ``lower``/``upper`` are the tar size bounds (ignored for tj). The
+    Runs in a fresh subprocess (see ``solve_isolated``). ``model`` is ``"tj"``,
+    ``"tar"``, or ``"ts"``; ``lower``/``upper`` are the tar size bounds (ignored
+    otherwise). For the ts (token sliding) model the underlying graph's ``edges``
+    double as the adjacency passed to ``get_reconf_seq`` as ``graph``. The
     returned value is a list of sorted integer vertex lists, picklable across the
     process boundary.
     """
@@ -108,8 +110,9 @@ def _solve_worker(n, edges, s, t, model, lower, upper):
 
     VertexSetSet.set_universe(list(range(1, n + 1)))
     independent_sets = VertexSetSet.independent_sets(edges)
+    graph = edges if model == "ts" else None
     seq = reconf.get_reconf_seq(
-        s, t, independent_sets, model=model, lower=lower, upper=upper
+        s, t, independent_sets, model=model, lower=lower, upper=upper, graph=graph
     )
     return [sorted(state) for state in seq]
 
@@ -125,8 +128,9 @@ def solve_isolated(n, edges, s, t, model="tj", lower=None, upper=None):
     own process gives every instance a clean universe, so the tests stay
     reliable regardless of run order.
 
-    ``model`` selects ``"tj"`` (token jumping) or ``"tar"`` (token
-    addition/removal); ``lower``/``upper`` bound the tar state size.
+    ``model`` selects ``"tj"`` (token jumping), ``"tar"`` (token
+    addition/removal), or ``"ts"`` (token sliding, using ``edges`` as the
+    adjacency); ``lower``/``upper`` bound the tar state size.
     """
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(1) as pool:
@@ -145,8 +149,9 @@ def _longest_worker(n, edges, s, model, lower, upper):
 
     VertexSetSet.set_universe(list(range(1, n + 1)))
     independent_sets = VertexSetSet.independent_sets(edges)
+    graph = edges if model == "ts" else None
     seq = reconf.get_longest_shortest_seq(
-        s, independent_sets, model=model, lower=lower, upper=upper
+        s, independent_sets, model=model, lower=lower, upper=upper, graph=graph
     )
     return [sorted(state) for state in seq]
 
