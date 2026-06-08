@@ -22,6 +22,14 @@ pip install reconfillion
 
 ## Tutorial
 
+A *combinatorial reconfiguration problem* asks, given a start state `s` and a
+goal state `t` (each a subset of elements such as edges or vertices) drawn from a
+search space of valid states, for a step-by-step *reconfiguration sequence* that
+transforms `s` into `t` so that every intermediate state is valid and consecutive
+states differ by a single legal *move*. What counts as a move is decided by the
+chosen **model**; reconfillion supports token jumping (`tj`), token
+addition/removal (`tar`), and token sliding (`ts`).
+
 Let's consider to solve the spanning tree reconfiguration problem.
 In reconfillion (and graphillion), an edge is represented by a tuple of two vertices, and a graph is represented by a list of edges.
 
@@ -41,7 +49,15 @@ GraphSet.set_universe(graph) # See the graphillion manual.
 spanning_trees = GraphSet.trees(is_spanning = True)
 ```
 
-Then, by doing the following method, we can obtain the reconfiguration sequence between s and t.
+### Token jumping (`tj`)
+
+Under the **token jumping** model a single move *removes* one token and *adds*
+one token at the same time, so the size of the state stays fixed (`|s|` must
+equal `|t|`). Thinking of each element in a state as a token, one move picks up a
+token and drops it anywhere else, as long as the resulting state is still valid.
+
+By doing the following method, we can obtain the reconfiguration sequence
+between `s` and `t`.
 
 ```
 s = [(1, 2), (1, 3), (1, 4)] # start spanning tree
@@ -52,6 +68,10 @@ reconf_sequence = reconf.get_reconf_seq(s, t, spanning_trees, model = 'tj')
 
 # obtained [[(1, 4), (2, 4), (3, 4)], [(1, 2), (1, 4), (2, 4)], [(1, 2), (1, 3), (1, 4)]]
 ```
+
+The returned list is a shortest sequence: consecutive spanning trees differ by
+exactly one swapped edge, and the first/last entries are `t`/`s`. If `t` is
+unreachable from `s`, `get_reconf_seq` returns `[]`.
 
 ### Token addition/removal (`tar`)
 
