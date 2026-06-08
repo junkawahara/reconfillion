@@ -53,6 +53,20 @@ reconf_sequence = reconf.get_reconf_seq(s, t, spanning_trees, model = 'tj')
 # obtained [[(1, 4), (2, 4), (3, 4)], [(1, 2), (1, 4), (2, 4)], [(1, 2), (1, 3), (1, 4)]]
 ```
 
+## Tests
+
+A pytest suite under `tests/` exercises the token jumping (`tj`) model on a
+small set of independent set reconfiguration instances bundled in `tests/data/`
+(a subset of the [Core Challenge 2022 benchmark](https://github.com/core-challenge/2022benchmark);
+see `tests/data/README.md`). Install the test dependencies and run pytest:
+
+```
+pip install -e ".[test]"
+pytest -s tests/
+```
+
+The `-s` flag shows a per-instance summary (reachability and sequence length).
+
 ## Note
 
 This software (and graphillion) needs a lot of memory to solve problems with large-size instances.
