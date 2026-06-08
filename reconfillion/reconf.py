@@ -114,6 +114,34 @@ def _effective_space(states, search_space, model, lower, upper):
     return search_space
 
 def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper = None):
+    """Return a shortest reconfiguration sequence from ``s`` to ``t``.
+
+    Given a start state ``s`` and goal state ``t`` (each a subset of the
+    elements/edges/vertices defining ``search_space``), find a shortest series
+    of single legal moves transforming ``s`` into ``t`` while every intermediate
+    state stays inside ``search_space``. The result is a list of ``set`` states
+    ``[s, ..., t]`` where consecutive states differ by exactly one move; an empty
+    list ``[]`` means ``t`` is unreachable from ``s``.
+
+    ``model`` selects the move operator:
+
+    - ``'tj'`` (token jumping): each move removes one element and adds one,
+      keeping the cardinality fixed (so ``|s|`` must equal ``|t|``).
+    - ``'tar'`` (token addition/removal): each move adds *or* removes one element
+      (cardinality changes by +-1). ``lower``/``upper`` (either may be ``None``)
+      bound every state's size; ``s`` and ``t`` must lie within ``[lower, upper]``
+      but may differ in size. ``lower``/``upper`` are rejected for other models.
+
+    The search is a breadth-first frontier expansion over ZDD set families
+    (``_forward_bfs``): starting from ``{s}`` it expands one move at a time,
+    intersecting with the effective (size-restricted) search space, and stops as
+    soon as ``t`` appears -- so the reconstructed sequence (``_get_seq``, walking
+    the frontiers backward from ``t``) is shortest. If the frontier saturates
+    without reaching ``t``, ``t`` is unreachable and ``[]`` is returned.
+
+    Raises ``ValueError`` if ``s`` or ``t`` is not in ``search_space``, or (for
+    tar) falls outside ``[lower, upper]``. ``k`` is an unused placeholder.
+    """
     if model not in ('tj', 'tar'):
         raise NotImplementedError
 
