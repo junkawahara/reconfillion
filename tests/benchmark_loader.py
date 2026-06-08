@@ -133,6 +133,36 @@ def solve_isolated(n, edges, s, t, model="tj", lower=None, upper=None):
         return pool.apply(_solve_worker, (n, edges, s, t, model, lower, upper))
 
 
+def _longest_worker(n, edges, s, model, lower, upper):
+    """Solve ``get_longest_shortest_seq`` for one instance from start ``s`` only.
+
+    The mirror of ``_solve_worker`` for the single-start "farthest state" query.
+    Runs in a fresh subprocess (see ``solve_longest_isolated``) and returns a
+    list of sorted integer vertex lists, picklable across the process boundary.
+    """
+    from graphillion import VertexSetSet
+    from reconfillion import reconf
+
+    VertexSetSet.set_universe(list(range(1, n + 1)))
+    independent_sets = VertexSetSet.independent_sets(edges)
+    seq = reconf.get_longest_shortest_seq(
+        s, independent_sets, model=model, lower=lower, upper=upper
+    )
+    return [sorted(state) for state in seq]
+
+
+def solve_longest_isolated(n, edges, s, model="tj", lower=None, upper=None):
+    """Run ``_longest_worker`` in a fresh ('spawn') subprocess and return its result.
+
+    Same per-instance process isolation as ``solve_isolated`` (graphillion keeps
+    its ZDD universe in global mutable state); see ``solve_isolated`` for the
+    rationale.
+    """
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(1) as pool:
+        return pool.apply(_longest_worker, (n, edges, s, model, lower, upper))
+
+
 def is_independent(edges, vertices):
     """Return True iff ``vertices`` is an independent set under ``edges``.
 

@@ -82,6 +82,27 @@ reconf_sequence = reconf.get_reconf_seq(
 If `s` or `t` has a size outside `[lower, upper]`, `get_reconf_seq` raises
 `ValueError`.
 
+### Farthest state from a single start (`get_longest_shortest_seq`)
+
+Sometimes you have only a start state `s` and want the *hardest* target to reach
+from it: a state whose shortest reconfiguration distance from `s` is as large as
+possible (the *eccentricity* of `s` in the move graph). `get_longest_shortest_seq`
+takes only `s` (no `t`), explores every state reachable from `s`, picks a
+farthest one, and returns a shortest sequence to it.
+
+```
+# reuse the spanning trees from the tutorial above
+s = [(1, 2), (1, 3), (1, 4)] # start spanning tree
+
+# a shortest sequence from s to one of the farthest spanning trees (tj model).
+reconf_sequence = reconf.get_longest_shortest_seq(s, spanning_trees, model = 'tj')
+
+# reconf_sequence[0] == s, and its length - 1 is the farthest distance from s.
+```
+
+It supports the same `tj` and `tar` models (`tar` takes the same `lower` /
+`upper` bounds). If `s` cannot make a single legal move, `[s]` is returned.
+
 ## Tests
 
 A pytest suite under `tests/` exercises the token jumping (`tj`) and token
