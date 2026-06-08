@@ -53,10 +53,40 @@ reconf_sequence = reconf.get_reconf_seq(s, t, spanning_trees, model = 'tj')
 # obtained [[(1, 4), (2, 4), (3, 4)], [(1, 2), (1, 4), (2, 4)], [(1, 2), (1, 3), (1, 4)]]
 ```
 
+### Token addition/removal (`tar`)
+
+Under the **token addition/removal** model a single move *adds* one token or
+*removes* one token, so the size of the state changes by one each step (and `s`
+and `t` may even have different sizes). To keep states meaningful you bound the
+state size with the keyword arguments `lower` and `upper`: every intermediate
+state must have size within `[lower, upper]`. Use a lower bound for problems
+whose feasible states are downward closed (e.g. independent sets, where you must
+keep at least `k` tokens) and an upper bound for upward-closed problems (e.g.
+dominating sets). Either bound may be `None`, meaning "no bound in that
+direction".
+
+```
+from graphillion import VertexSetSet
+
+VertexSetSet.set_universe()
+independent_sets = VertexSetSet.independent_sets(graph)
+
+s = [1, 3] # start independent set
+t = [2, 4] # goal independent set
+
+# reconfigure under token addition/removal, keeping the size in [1, 2].
+reconf_sequence = reconf.get_reconf_seq(
+    s, t, independent_sets, model = 'tar', lower = 1, upper = 2)
+```
+
+If `s` or `t` has a size outside `[lower, upper]`, `get_reconf_seq` raises
+`ValueError`.
+
 ## Tests
 
-A pytest suite under `tests/` exercises the token jumping (`tj`) model on a
-small set of independent set reconfiguration instances bundled in `tests/data/`
+A pytest suite under `tests/` exercises the token jumping (`tj`) and token
+addition/removal (`tar`) models on a small set of independent set
+reconfiguration instances bundled in `tests/data/`
 (a subset of the [Core Challenge 2022 benchmark](https://github.com/core-challenge/2022benchmark);
 see `tests/data/README.md`). Install the test dependencies and run pytest:
 

@@ -95,22 +95,26 @@ def instance_paths(col_relpath, dat_relpath):
     return BENCHMARK_ROOT / col_relpath, BENCHMARK_ROOT / dat_relpath
 
 
-def _solve_worker(n, edges, s, t):
-    """Solve one instance under the tj model and return the sequence.
+def _solve_worker(n, edges, s, t, model, lower, upper):
+    """Solve one instance and return the reconfiguration sequence.
 
-    Runs in a fresh subprocess (see ``solve_isolated``). The returned value is a
-    list of sorted integer vertex lists, picklable across the process boundary.
+    Runs in a fresh subprocess (see ``solve_isolated``). ``model`` is ``"tj"`` or
+    ``"tar"``; ``lower``/``upper`` are the tar size bounds (ignored for tj). The
+    returned value is a list of sorted integer vertex lists, picklable across the
+    process boundary.
     """
     from graphillion import VertexSetSet
     from reconfillion import reconf
 
     VertexSetSet.set_universe(list(range(1, n + 1)))
     independent_sets = VertexSetSet.independent_sets(edges)
-    seq = reconf.get_reconf_seq(s, t, independent_sets, model="tj")
+    seq = reconf.get_reconf_seq(
+        s, t, independent_sets, model=model, lower=lower, upper=upper
+    )
     return [sorted(state) for state in seq]
 
 
-def solve_isolated(n, edges, s, t):
+def solve_isolated(n, edges, s, t, model="tj", lower=None, upper=None):
     """Run ``_solve_worker`` in a fresh ('spawn') subprocess and return its result.
 
     graphillion keeps its ZDD universe in *global* mutable state. Repeatedly
@@ -120,10 +124,13 @@ def solve_isolated(n, edges, s, t):
     graphillion-level bug, not a reconfillion one. Solving each instance in its
     own process gives every instance a clean universe, so the tests stay
     reliable regardless of run order.
+
+    ``model`` selects ``"tj"`` (token jumping) or ``"tar"`` (token
+    addition/removal); ``lower``/``upper`` bound the tar state size.
     """
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(1) as pool:
-        return pool.apply(_solve_worker, (n, edges, s, t))
+        return pool.apply(_solve_worker, (n, edges, s, t, model, lower, upper))
 
 
 def is_independent(edges, vertices):
