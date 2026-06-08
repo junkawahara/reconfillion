@@ -6,6 +6,7 @@ Reconfillion is a tool for solving combinatorial reconfiguration problems. It wo
 
 ## Requirements
 
+* Python 3.9 or higher.
 * [Graphillion version v1.7 or higher](https://github.com/takemaru/graphillion/) is needed.
 
 ## License
