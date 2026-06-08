@@ -1,0 +1,14 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Build / packaging artifacts
+*.egg-info/
+build/
+dist/
+
+# Test caches
+.pytest_cache/
+
+# Core Challenge 2022 benchmark full checkout (tests use the subset in tests/data/)
+/2022benchmark/
