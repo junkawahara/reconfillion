@@ -13,8 +13,14 @@ dependencies = [
     "graphillion>=1.7"
 ]
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [project.urls]
 Homepage = "https://github.com/junkawahara/reconfillion"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.setuptools]
 packages = ["reconfillion"]
