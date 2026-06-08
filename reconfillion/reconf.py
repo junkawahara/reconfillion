@@ -48,6 +48,36 @@ def _restrict_size(family, lower, upper):
         family = family.smaller(upper + 1)  # keep size <= upper
     return family
 
+def _forward_bfs(s, search_space, effective_space, model, stop):
+    """Expand the reachable frontier from ``s`` one move at a time.
+
+    Starting from the singleton family ``{s}``, repeatedly apply ``_one_move``
+    and intersect with ``effective_space``. ``setset_seq[i]`` is the family of
+    all valid states reachable from ``s`` in exactly ``i`` moves.
+
+    The loop stops when ``stop(next_ss)`` is true (early stop, e.g. the goal
+    appeared) or when a new frontier adds no state not seen before (the
+    reachable component is exhausted). Returns ``(setset_seq, stopped)`` where
+    ``stopped`` is ``True`` for an early stop and ``False`` for saturation.
+
+    Saturation is detected by tracking the cumulative set of reached states.
+    Comparing consecutive frontiers (``setset_seq[-2]`` vs ``setset_seq[-1]``)
+    is not enough for tar: each move changes the size by +-1, so the "exactly
+    i moves" frontier alternates between size parities and consecutive frontiers
+    are never equal -- the loop would run forever.
+    """
+    setset_seq = [_singleton(s, search_space)]
+    reached = setset_seq[0]
+    while True:
+        next_ss = _one_move(setset_seq[-1], search_space, model) & effective_space
+        setset_seq.append(next_ss)
+        if stop(next_ss):
+            return setset_seq, True
+        union = reached | next_ss
+        if union == reached:
+            return setset_seq, False
+        reached = union
+
 def _get_seq(setset_seq, s, t, search_space, model, k):
     reconf_seq = [set(t)]
     current_set = t
@@ -57,6 +87,23 @@ def _get_seq(setset_seq, s, t, search_space, model, k):
         current_set = (setset_seq[i] & next_ss).choice()
         reconf_seq.insert(0, set(current_set))
     return reconf_seq
+
+def _effective_space(states, search_space, model, lower, upper):
+    """Validate tar size bounds and return the effective (size-restricted) space.
+
+    ``states`` is an iterable of ``(name, state)`` pairs to check. For the tar
+    model, every state must fall within ``[lower, upper]`` (or ``ValueError`` is
+    raised) and the effective search space is ``search_space`` restricted to that
+    size range. For other models the search space is returned unchanged.
+    """
+    if model == 'tar':
+        for name, state in states:
+            if lower is not None and len(state) < lower:
+                raise ValueError(f'|{name}| ({len(state)}) is below lower ({lower}).')
+            if upper is not None and len(state) > upper:
+                raise ValueError(f'|{name}| ({len(state)}) is above upper ({upper}).')
+        return _restrict_size(search_space, lower, upper)
+    return search_space
 
 def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper = None):
     if model not in ('tj', 'tar'):
@@ -71,38 +118,60 @@ def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper 
     # For the tar model, states must stay within the [lower, upper] size range.
     # The valid search space is therefore the size-restricted search_space, and
     # s/t must themselves fall inside the range.
-    if model == 'tar':
-        for name, state in (('s', s), ('t', t)):
-            if lower is not None and len(state) < lower:
-                raise ValueError(f'|{name}| ({len(state)}) is below lower ({lower}).')
-            if upper is not None and len(state) > upper:
-                raise ValueError(f'|{name}| ({len(state)}) is above upper ({upper}).')
-        effective_space = _restrict_size(search_space, lower, upper)
-    else:
-        effective_space = search_space
+    effective_space = _effective_space(
+        (('s', s), ('t', t)), search_space, model, lower, upper)
 
     if s == t:
         return [s]
 
-    setset_seq = [_singleton(s, search_space)]
+    # Expand the frontier until t appears (reachable) or it saturates without t.
+    setset_seq, found = _forward_bfs(
+        s, search_space, effective_space, model, stop=lambda ss: t in ss)
+    if found:
+        return _get_seq(setset_seq, s, t, search_space, model, k)
+    return []
 
-    # Saturation is detected by tracking the cumulative set of reached states.
-    # Comparing consecutive frontiers (setset_seq[-2] vs setset_seq[-1]) is not
-    # enough for tar: each move changes the size by +-1, so the "exactly i moves"
-    # frontier alternates between size parities and consecutive frontiers are
-    # never equal -- the loop would run forever. Once a new frontier adds no
-    # state we have not seen before, the reachable component is exhausted and t
-    # is unreachable.
+def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper = None):
+    """Return a shortest reconfiguration sequence to a farthest state from ``s``.
+
+    Given only the start state ``s``, find a state ``t`` reachable from ``s``
+    whose shortest-move distance from ``s`` is maximal (if several states tie
+    for farthest, any one is chosen) and return a shortest sequence from ``s``
+    to that ``t``. This realises the *eccentricity* of ``s`` in the move graph.
+    If ``s`` cannot make a single legal move, ``[s]`` is returned.
+
+    Supports the same ``tj`` / ``tar`` models as ``get_reconf_seq`` (for tar,
+    ``lower``/``upper`` bound every state's size). Unlike ``get_reconf_seq`` the
+    frontier is always expanded to saturation, since the farthest state is not
+    known in advance.
+    """
+    if model not in ('tj', 'tar'):
+        raise NotImplementedError
+
+    if s not in search_space:
+        raise ValueError('s must be in search_space.')
+
+    effective_space = _effective_space(
+        (('s', s),), search_space, model, lower, upper)
+
+    # Expand the whole reachable component (never stop early).
+    setset_seq, _ = _forward_bfs(
+        s, search_space, effective_space, model, stop=lambda ss: False)
+
+    # The farthest distance is the last level at which a state appears for the
+    # first time. _forward_bfs's final frontier is the saturating one (it adds
+    # nothing new), and for tar earlier states reappear by parity, so scan the
+    # cumulative reached set to find the last level with a genuinely new state.
     reached = setset_seq[0]
+    last_level, last_new = 0, setset_seq[0]
+    for i in range(1, len(setset_seq)):
+        new = setset_seq[i] - reached
+        if new:  # truthy iff the family is non-empty (avoids len() overflow)
+            last_level, last_new = i, new
+        reached = reached | setset_seq[i]
 
-    while True:
-        next_ss = _one_move(setset_seq[-1], search_space, model) & effective_space
+    if last_level == 0:
+        return [s]
 
-        setset_seq.append(next_ss)
-        if t in next_ss:
-            return _get_seq(setset_seq, s, t, search_space, model, k)
-
-        union = reached | next_ss
-        if union == reached:
-            return []
-        reached = union
+    t = last_new.choice()
+    return _get_seq(setset_seq[:last_level + 1], s, t, search_space, model, k=1)
