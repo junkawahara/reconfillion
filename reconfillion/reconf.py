@@ -19,6 +19,8 @@ def _one_move(family, search_space, model):
       (size changes by +-1). The caller is responsible for restricting the
       result to the valid size range by intersecting with the search space.
     """
+    # ``model`` is validated by the public entry points, so every branch below
+    # is expected to return; the trailing ``raise`` is a defensive backstop.
     if isinstance(search_space, GraphSet):
         if model == 'tj':
             return family.remove_add_some_edges()
@@ -73,10 +75,12 @@ def _forward_bfs(s, search_space, effective_space, model, stop):
         setset_seq.append(next_ss)
         if stop(next_ss):
             return setset_seq, True
-        union = reached | next_ss
-        if union == reached:
+        # Saturation: the new frontier introduces no state not already reached.
+        # ``next_ss <= reached`` is equivalent to ``reached | next_ss == reached``
+        # but avoids building the union when the frontier is already subsumed.
+        if next_ss <= reached:
             return setset_seq, False
-        reached = union
+        reached = reached | next_ss
 
 def _get_seq(setset_seq, s, t, search_space, model, k):
     reconf_seq = [set(t)]
@@ -94,7 +98,8 @@ def _effective_space(states, search_space, model, lower, upper):
     ``states`` is an iterable of ``(name, state)`` pairs to check. For the tar
     model, every state must fall within ``[lower, upper]`` (or ``ValueError`` is
     raised) and the effective search space is ``search_space`` restricted to that
-    size range. For other models the search space is returned unchanged.
+    size range. For other models ``lower``/``upper`` are not meaningful and must
+    be left as ``None``; the search space is returned unchanged.
     """
     if model == 'tar':
         for name, state in states:
@@ -103,6 +108,9 @@ def _effective_space(states, search_space, model, lower, upper):
             if upper is not None and len(state) > upper:
                 raise ValueError(f'|{name}| ({len(state)}) is above upper ({upper}).')
         return _restrict_size(search_space, lower, upper)
+    if lower is not None or upper is not None:
+        raise ValueError(
+            f"lower/upper are only supported for the 'tar' model, not '{model}'.")
     return search_space
 
 def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper = None):
@@ -122,7 +130,7 @@ def get_reconf_seq(s, t, search_space, model = 'tj', k = 1, lower = None, upper 
         (('s', s), ('t', t)), search_space, model, lower, upper)
 
     if s == t:
-        return [s]
+        return [set(s)]
 
     # Expand the frontier until t appears (reachable) or it saturates without t.
     setset_seq, found = _forward_bfs(
@@ -138,7 +146,10 @@ def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper 
     whose shortest-move distance from ``s`` is maximal (if several states tie
     for farthest, any one is chosen) and return a shortest sequence from ``s``
     to that ``t``. This realises the *eccentricity* of ``s`` in the move graph.
-    If ``s`` cannot make a single legal move, ``[s]`` is returned.
+    If ``s`` cannot make a single legal move, ``[set(s)]`` is returned.
+
+    Every state in the returned sequence is a ``set`` (including the trivial
+    single-element case), matching ``get_reconf_seq``.
 
     Supports the same ``tj`` / ``tar`` models as ``get_reconf_seq`` (for tar,
     ``lower``/``upper`` bound every state's size). Unlike ``get_reconf_seq`` the
@@ -171,7 +182,7 @@ def get_longest_shortest_seq(s, search_space, model = 'tj', lower = None, upper 
         reached = reached | setset_seq[i]
 
     if last_level == 0:
-        return [s]
+        return [set(s)]
 
     t = last_new.choice()
     return _get_seq(setset_seq[:last_level + 1], s, t, search_space, model, k=1)
