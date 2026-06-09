@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `reconfillion.__version__`, derived from the installed package metadata via
+  `importlib.metadata` so `pyproject.toml` stays the single source of truth.
 - `requires-python = ">=3.9"` to the package metadata.
 - This `CHANGELOG.md`.
 - A `.gitignore` covering Python caches, packaging artifacts, the pytest
